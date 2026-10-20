@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: talentiq-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: talentiq_user
+      POSTGRES_PASSWORD: talentiq_password
+      POSTGRES_DB: talentiq_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U talentiq_user -d talentiq_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: talentiq-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: talentiq-backend
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://talentiq_user:talentiq_password@postgres:5432/talentiq_db
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=talentiq-production-secret-jwt-key-2026
+      - AI_MOCK_MODE=true
+      - AI_PROVIDER=mock
+      - AI_API_KEY=
+      - AI_MODEL=gpt-4o-mini
+      - STT_PROVIDER=mock
+      - STT_API_KEY=
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000,http://localhost
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: talentiq-frontend
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:
