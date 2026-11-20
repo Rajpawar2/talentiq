@@ -130,12 +130,46 @@ talentiq/
 
 ## ⚡ Quick Start (Local Development)
 
-### 1. Prerequisites
+### 🚀 Option A: Single Run Command (Recommended)
+Launch both the FastAPI Backend and Vite Frontend concurrently with a single command from the repository root:
+
+```bash
+./start.sh
+```
+
+Or using Make:
+```bash
+make dev
+```
+
+Or a single one-liner command:
+```bash
+(cd backend && .venv/bin/uvicorn app.main:app --reload --port 8000) & (cd frontend && npm run dev)
+```
+
+- **Frontend live at:** [http://localhost:5173](http://localhost:5173)
+- **Backend API live at:** [http://localhost:8000](http://localhost:8000)
+- **Interactive Swagger Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
+
+*(Press `Ctrl+C` to cleanly shut down both servers).*
+
+---
+
+### 🐳 Option B: Docker Compose (Full Stack)
+```bash
+docker compose up --build
+```
+
+---
+
+### 🛠️ Option C: Manual Multi-Terminal Setup
+
+#### 1. Prerequisites
 - **Node.js** v18+ (tested on Node v20/v26)
 - **Python** 3.11+ (tested on Python 3.12)
 - **Git**
 
-### 2. Backend Setup
+#### 2. Backend Setup
 ```bash
 cd talentiq/backend
 
