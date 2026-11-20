@@ -15,7 +15,7 @@ def client():
     return TestClient(app)
 
 def create_and_authenticate_user(client, name="Alex Morgan", email=None, password="Password123!", target_role="Software Engineer") -> dict:
-    """Helper to perform the complete register -> OTP verify -> login flow and return auth headers."""
+    """Helper to perform the complete register -> login flow without OTP and return auth headers."""
     if not email:
         email = f"user_{uuid.uuid4().hex[:8]}@example.com"
     
@@ -28,18 +28,7 @@ def create_and_authenticate_user(client, name="Alex Morgan", email=None, passwor
     })
     assert reg_res.status_code == 201
 
-    # 2. Extract OTP from mock email
-    latest_email = email_service.provider.sent_messages[-1]
-    otp = latest_email["subject"].split()[0]
-
-    # 3. Verify Email
-    ver_res = client.post("/api/auth/verify-email", json={
-        "email": email,
-        "otp": otp
-    })
-    assert ver_res.status_code == 200
-
-    # 4. Login
+    # 2. Login immediately
     login_res = client.post("/api/auth/login", json={
         "email": email,
         "password": password
@@ -74,19 +63,7 @@ def test_auth_workflow(client):
     assert reg_data["success"] is True
     assert reg_data["email"] == email
 
-    # 2. Extract OTP from mock email
-    otp = email_service.provider.sent_messages[-1]["subject"].split()[0]
-    assert len(otp) == 6
-
-    # 3. Verify OTP
-    verify_res = client.post("/api/auth/verify-email", json={
-        "email": email,
-        "otp": otp
-    })
-    assert verify_res.status_code == 200
-    assert verify_res.json()["success"] is True
-
-    # 4. Login
+    # 2. Login directly without OTP
     login_res = client.post("/api/auth/login", json={
         "email": email,
         "password": "SecurePassword123!"
@@ -95,12 +72,11 @@ def test_auth_workflow(client):
     token_data = login_res.json()
     assert "access_token" in token_data
     assert token_data["user"]["email"] == email
-    assert token_data["user"]["email_verified"] is True
 
     token = token_data["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
-    # 5. Authenticate /me
+    # 3. Authenticate /me
     me_res = client.get("/api/auth/me", headers=headers)
     assert me_res.status_code == 200
     assert me_res.json()["name"] == "Alex Morgan"

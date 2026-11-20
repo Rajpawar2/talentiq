@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bot, User as UserIcon, Mail, Lock, Briefcase, ArrowRight } from 'lucide-react';
+import { User as UserIcon, Mail, Lock, Briefcase, ArrowRight, ShieldCheck } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import { useAuth } from '../context/AuthContext';
@@ -14,6 +14,7 @@ export const RegisterPage: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [targetRole, setTargetRole] = useState('Full-Stack Engineer');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,12 +22,24 @@ export const RegisterPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match. Please ensure both passwords match.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const res = await register(name, email, password, targetRole);
-      addToast('Verification email sent successfully.', 'success');
-      navigate('/verify-email', { state: { email: res.email || email.trim().toLowerCase() } });
+      const res = await register(name, email, password, targetRole, confirmPassword);
+      const cleanEmail = res.email || email.trim().toLowerCase();
+      addToast('Account created successfully! Please sign in.', 'success');
+      navigate('/login', { state: { registeredEmail: cleanEmail } });
     } catch (err: any) {
       const msg = err.response?.data?.detail || 'Registration failed. Please check your information.';
       setError(msg);
@@ -82,6 +95,17 @@ export const RegisterPage: React.FC = () => {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               leftIcon={<Lock className="w-4 h-4" />}
+            />
+
+            <Input
+              label="Confirm Password"
+              type="password"
+              required
+              minLength={6}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="••••••••"
+              leftIcon={<ShieldCheck className="w-4 h-4" />}
             />
 
             <div className="space-y-1.5">

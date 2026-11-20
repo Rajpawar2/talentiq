@@ -6,6 +6,10 @@ class ParsedResumeData(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+    location: Optional[str] = None
+    linkedin: Optional[str] = None
+    github: Optional[str] = None
+    portfolio: Optional[str] = None
     education: List[Dict[str, Any]] = []
     skills: List[str] = []
     experience: List[Dict[str, Any]] = []

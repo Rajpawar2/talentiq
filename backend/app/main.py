@@ -1,3 +1,5 @@
+import logging
+import sys
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,10 +11,20 @@ from app.database import init_db
 from app.api import auth, resumes, jobs, matching, interviews, questions, evaluations, analytics, voice
 from app.websocket.manager import ws_manager
 
+# Configure structured application logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger("talentiq")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize database tables on startup
     init_db()
+    logger.info("Database initialized successfully.")
+    logger.info("Email service provider mode: %s (EMAIL_MOCK_MODE=%s)", settings.EMAIL_PROVIDER, settings.EMAIL_MOCK_MODE)
     yield
 
 app = FastAPI(

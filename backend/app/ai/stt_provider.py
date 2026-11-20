@@ -6,18 +6,13 @@ from app.config import settings
 class MockSpeechProvider(SpeechProvider):
     def transcribe_audio(self, audio_bytes: bytes, filename: str) -> str:
         """
-        Deterministic mock transcription that simulates audio speech output.
+        Deterministic speech transcription provider.
+        Returns empty when no speech recognition model is configured locally,
+        relying on browser Web Speech API or external Whisper STT.
         """
         if not audio_bytes or len(audio_bytes) < 100:
-            return "In our previous system, we used FastAPI for asynchronous microservices and PostgreSQL for relational persistence."
-        
-        # Realistic answer transcription based on size heuristic
-        return (
-            "In our FastAPI architecture, we used asynchronous endpoint handlers with dependency injection "
-            "for database sessions. To prevent blocking the main event loop during heavy I/O, we offloaded "
-            "CPU-intensive background operations to a distributed worker queue and implemented Redis caching "
-            "for read-heavy routes, which reduced p99 latency significantly."
-        )
+            return ""
+        return ""
 
 
 class WhisperSpeechProvider(SpeechProvider):

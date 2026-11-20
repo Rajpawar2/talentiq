@@ -22,41 +22,41 @@ def get_analytics_overview(
     total_interviews = len(interviews)
     completed_reports = [r for r in reports if r.overall_score > 0]
 
-    avg_score = round(sum(r.overall_score for r in completed_reports) / len(completed_reports), 1) if completed_reports else 78.5
-    best_score = max([r.overall_score for r in completed_reports], default=85.0)
+    if completed_reports:
+        avg_score = round(sum(r.overall_score for r in completed_reports) / len(completed_reports), 1)
+        best_score = max([r.overall_score for r in completed_reports], default=0.0)
 
-    tech_scores = [r.technical_score for r in completed_reports if r.technical_score > 0]
-    avg_tech = round(sum(tech_scores) / len(tech_scores), 1) if tech_scores else 82.0
+        tech_scores = [r.technical_score for r in completed_reports if r.technical_score > 0]
+        avg_tech = round(sum(tech_scores) / len(tech_scores), 1) if tech_scores else 0.0
 
-    comm_scores = [r.communication_score for r in completed_reports if r.communication_score > 0]
-    avg_comm = round(sum(comm_scores) / len(comm_scores), 1) if comm_scores else 77.0
+        comm_scores = [r.communication_score for r in completed_reports if r.communication_score > 0]
+        avg_comm = round(sum(comm_scores) / len(comm_scores), 1) if comm_scores else 0.0
+    else:
+        avg_score = 0.0
+        best_score = 0.0
+        avg_tech = 0.0
+        avg_comm = 0.0
 
-    resume_match = 84.0
+    # Resume Match Score
+    resume_match = 0.0
     latest_resume = db.query(Resume).filter(Resume.user_id == current_user.id).order_by(Resume.created_at.desc()).first()
     if latest_resume and latest_resume.skills:
-        resume_match = min(round(len(latest_resume.skills) * 8.5 + 40, 1), 95.0)
+        skill_count = len(latest_resume.skills)
+        resume_match = min(round(skill_count * 5.0 + 30.0, 1), 92.0)
 
-    # Performance trend list
+    # Performance trend list (authentic data only, never fake starter points)
     trend = []
     for r in completed_reports[-6:]:
         intv = db.query(Interview).filter(Interview.id == r.interview_id).first()
         trend.append(ScoreHistoryItem(
             interview_id=r.interview_id,
             date=r.created_at.strftime("%b %d"),
-            role=intv.role if intv else "Engineer",
+            role=intv.role if intv else "Candidate",
             overall_score=r.overall_score,
             technical_score=r.technical_score,
             communication_score=r.communication_score,
             problem_solving_score=r.problem_solving_score
         ))
-
-    if not trend:
-        # Default starter trend points so charts render beautifully on first visit
-        trend = [
-            ScoreHistoryItem(interview_id="demo-1", date="Day 1", role="Software Engineer", overall_score=68.0, technical_score=70.0, communication_score=65.0, problem_solving_score=69.0),
-            ScoreHistoryItem(interview_id="demo-2", date="Day 3", role="Software Engineer", overall_score=75.0, technical_score=78.0, communication_score=72.0, problem_solving_score=76.0),
-            ScoreHistoryItem(interview_id="demo-3", date="Today", role="Software Engineer", overall_score=83.0, technical_score=86.0, communication_score=80.0, problem_solving_score=84.0),
-        ]
 
     # Recent interview cards
     recent = []
@@ -71,23 +71,53 @@ def get_analytics_overview(
             "created_at": i.created_at.strftime("%Y-%m-%d %H:%M")
         })
 
-    skill_strengths = [
-        {"skill": "REST API Architecture", "level": 88, "status": "Strong"},
-        {"skill": "Asynchronous Concurrency", "level": 84, "status": "Strong"},
-        {"skill": "Relational Modeling", "level": 80, "status": "Proficient"},
-    ]
+    # Derive strengths & gaps from actual report evaluations
+    skill_strengths = []
+    skill_gaps = []
+    recommended_practice = []
 
-    skill_gaps = [
-        {"skill": "Distributed Transactions", "level": 60, "priority": "High"},
-        {"skill": "Cache Invalidation Strategies", "level": 65, "priority": "Medium"},
-        {"skill": "Verbal Filler Minimization", "level": 68, "priority": "Medium"},
-    ]
+    if completed_reports:
+        # Aggregate from candidate's reports
+        seen_strengths = set()
+        seen_weaknesses = set()
 
-    recommended_practice = [
-        "Practice high-throughput system design scenarios (e.g. rate limiters, message queues)",
-        "Incorporate explicit STAR metrics in behavioral answers",
-        "Timed technical coding mock focusing on edge cases"
-    ]
+        for rep in completed_reports:
+            for s in (rep.key_strengths or []):
+                cleaned_s = s.strip()
+                if cleaned_s and cleaned_s not in seen_strengths:
+                    seen_strengths.add(cleaned_s)
+                    skill_strengths.append({
+                        "skill": cleaned_s[:35],
+                        "level": min(int(rep.technical_score or 80), 95),
+                        "status": "Strong"
+                    })
+                    if len(skill_strengths) >= 4:
+                        break
+
+            for w in (rep.weak_areas or []):
+                cleaned_w = w.strip()
+                if cleaned_w and cleaned_w not in seen_weaknesses:
+                    seen_weaknesses.add(cleaned_w)
+                    skill_gaps.append({
+                        "skill": cleaned_w[:35],
+                        "level": max(int((rep.overall_score or 65) - 15), 45),
+                        "priority": "High" if len(skill_gaps) == 0 else "Medium"
+                    })
+                    if len(skill_gaps) >= 4:
+                        break
+
+            for p in (rep.prep_plan or []):
+                if p not in recommended_practice:
+                    recommended_practice.append(p)
+                if len(recommended_practice) >= 3:
+                    break
+
+    if not recommended_practice:
+        recommended_practice = [
+            "Start your first mock interview to evaluate your technical and communication baseline.",
+            "Upload your resume in Resume Intelligence to analyze technical skill coverage against job requirements.",
+            "Practice timed problem decomposition to build structured answering confidence."
+        ]
 
     return AnalyticsOverview(
         total_interviews=total_interviews,
@@ -110,50 +140,77 @@ def get_analytics_progress(
 ):
     """Retrieves deep progression curves and radar metrics across categories."""
     reports = db.query(InterviewReport).filter(InterviewReport.user_id == current_user.id).order_by(InterviewReport.created_at.asc()).all()
+    completed_reports = [r for r in reports if r.overall_score > 0]
 
     trend = []
-    for r in reports:
+    for r in completed_reports:
         intv = db.query(Interview).filter(Interview.id == r.interview_id).first()
         trend.append(ScoreHistoryItem(
             interview_id=r.interview_id,
             date=r.created_at.strftime("%b %d"),
-            role=intv.role if intv else "Engineer",
+            role=intv.role if intv else "Candidate",
             overall_score=r.overall_score,
             technical_score=r.technical_score,
             communication_score=r.communication_score,
             problem_solving_score=r.problem_solving_score
         ))
 
-    if not trend:
-        trend = [
-            ScoreHistoryItem(interview_id="p1", date="Week 1", role="Full-Stack Dev", overall_score=64.0, technical_score=66.0, communication_score=62.0, problem_solving_score=65.0),
-            ScoreHistoryItem(interview_id="p2", date="Week 2", role="Full-Stack Dev", overall_score=72.0, technical_score=75.0, communication_score=68.0, problem_solving_score=73.0),
-            ScoreHistoryItem(interview_id="p3", date="Week 3", role="Full-Stack Dev", overall_score=79.0, technical_score=82.0, communication_score=75.0, problem_solving_score=80.0),
-            ScoreHistoryItem(interview_id="p4", date="Week 4", role="Full-Stack Dev", overall_score=86.0, technical_score=89.0, communication_score=83.0, problem_solving_score=85.0),
+    if completed_reports:
+        avg_tech = round(sum(r.technical_score for r in completed_reports) / len(completed_reports), 1)
+        avg_comm = round(sum(r.communication_score for r in completed_reports) / len(completed_reports), 1)
+        avg_ps = round(sum(r.problem_solving_score for r in completed_reports) / len(completed_reports), 1)
+        avg_beh = round(sum(r.behavioral_score for r in completed_reports) / len(completed_reports), 1)
+
+        radar = [
+            {"subject": "Technical Depth", "score": int(avg_tech), "benchmark": 75},
+            {"subject": "Communication", "score": int(avg_comm), "benchmark": 70},
+            {"subject": "Problem Solving", "score": int(avg_ps), "benchmark": 75},
+            {"subject": "Behavioral / STAR", "score": int(avg_beh), "benchmark": 72},
+            {"subject": "Architecture", "score": int(avg_tech * 0.95), "benchmark": 70},
+            {"subject": "Pacing & Clarity", "score": int(avg_comm * 0.98), "benchmark": 68},
         ]
 
-    radar = [
-        {"subject": "Technical Depth", "score": 88, "benchmark": 75},
-        {"subject": "Communication", "score": 80, "benchmark": 70},
-        {"subject": "Problem Solving", "score": 85, "benchmark": 75},
-        {"subject": "Behavioral / STAR", "score": 78, "benchmark": 72},
-        {"subject": "Architecture", "score": 84, "benchmark": 70},
-        {"subject": "Pacing & Clarity", "score": 82, "benchmark": 68},
-    ]
+        insights = []
+        if len(completed_reports) > 1:
+            first_score = completed_reports[0].overall_score
+            latest_score = completed_reports[-1].overall_score
+            diff = round(latest_score - first_score, 1)
+            sign = "+" if diff >= 0 else ""
+            insights.append(f"Overall performance changed by {sign}{diff} points across your completed mock sessions.")
+        else:
+            insights.append(f"Baseline established at {completed_reports[0].overall_score}% overall readiness.")
 
-    insights = [
-        "Your technical scores improved by +22 points over the last 4 mock sessions.",
-        "Communication clarity increased after reducing verbal filler frequency from 7.2% to 2.4%.",
-        "Consistently strong performance in API design and database query optimization."
-    ]
+        latest_rep = completed_reports[-1]
+        if latest_rep.key_strengths:
+            insights.append(f"Key identified strength: {latest_rep.key_strengths[0]}")
+        if latest_rep.weak_areas:
+            insights.append(f"Primary area for improvement: {latest_rep.weak_areas[0]}")
+
+    else:
+        avg_tech = 0.0
+        avg_comm = 0.0
+        avg_ps = 0.0
+        avg_beh = 0.0
+        radar = [
+            {"subject": "Technical Depth", "score": 0, "benchmark": 75},
+            {"subject": "Communication", "score": 0, "benchmark": 70},
+            {"subject": "Problem Solving", "score": 0, "benchmark": 75},
+            {"subject": "Behavioral / STAR", "score": 0, "benchmark": 72},
+            {"subject": "Architecture", "score": 0, "benchmark": 70},
+            {"subject": "Pacing & Clarity", "score": 0, "benchmark": 68},
+        ]
+        insights = [
+            "Complete your first adaptive interview to generate personalized multi-category progression curves.",
+            "Your competency radar benchmarks your skills directly against senior engineering industry standards."
+        ]
 
     return AnalyticsProgress(
         score_over_time=trend,
         category_averages={
-            "technical": 86.0,
-            "communication": 80.0,
-            "problem_solving": 84.0,
-            "behavioral": 78.0
+            "technical": avg_tech,
+            "communication": avg_comm,
+            "problem_solving": avg_ps,
+            "behavioral": avg_beh
         },
         skill_radar=radar,
         improvement_insights=insights

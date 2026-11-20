@@ -249,131 +249,59 @@ class MockAIProvider(AIProvider):
             }
 
     def analyze_resume(self, resume_text: str) -> Dict[str, Any]:
-        """Extracts structured entities, skills, education, and experiences."""
-        lines = [line.strip() for line in resume_text.split("\n") if line.strip()]
-        
-        # Email & Phone regex
-        email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', resume_text)
-        email = email_match.group(0) if email_match else "candidate@example.com"
-        
-        phone_match = re.search(r'(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', resume_text)
-        phone = phone_match.group(0) if phone_match else "+1 (555) 019-2834"
-        
-        name = lines[0] if lines else "Alex Morgan"
-        if len(name.split()) > 4 or "@" in name:
-            name = "Alex Morgan"
+        """
+        Extracts structured profile data directly from candidate's actual resume text.
+        Never fabricates employment, education, or projects.
+        """
+        from app.services.resume_parser import (
+            clean_extracted_text, split_into_sections, extract_candidate_name,
+            extract_contact_info, extract_skills_from_text, extract_education,
+            extract_work_experience, extract_projects, extract_certifications
+        )
+        cleaned = clean_extracted_text(resume_text)
+        sections = split_into_sections(cleaned)
+        lines = [line.strip() for line in cleaned.split("\n") if line.strip()]
 
-        # Known skills scanning
-        skill_catalog = [
-            "Python", "FastAPI", "React", "TypeScript", "JavaScript", "Docker", "Kubernetes",
-            "PostgreSQL", "SQL", "Redis", "AWS", "GCP", "CI/CD", "Git", "System Design",
-            "REST APIs", "GraphQL", "Tailwind CSS", "Next.js", "Node.js", "Microservices",
-            "PyTorch", "TensorFlow", "Pandas", "Scikit-Learn", "HTML5", "CSS3", "Linux"
-        ]
-        
-        matched_skills = []
-        lower_text = resume_text.lower()
-        for skill in skill_catalog:
-            if re.search(r'\b' + re.escape(skill.lower()) + r'\b', lower_text):
-                matched_skills.append(skill)
-        
-        if not matched_skills:
-            matched_skills = ["Python", "FastAPI", "PostgreSQL", "REST APIs", "Docker", "Git"]
+        name = extract_candidate_name(cleaned, lines)
+        contact = extract_contact_info(cleaned)
+        skills = extract_skills_from_text(sections["skills"] or cleaned)
+        education = extract_education(sections["education"], cleaned)
+        experience = extract_work_experience(sections["experience"])
+        projects = extract_projects(sections["projects"])
+        certifications = extract_certifications(sections["certifications"], cleaned)
 
-        # Parse experience blocks
-        experience = [
-            {
-                "role": "Senior Software Engineer",
-                "company": "NextGen Systems",
-                "duration": "2022 - Present",
-                "highlights": [
-                    "Architected high-throughput microservices processing 10M+ daily events",
-                    "Reduced p99 API latency from 450ms to 85ms via Redis caching and query indexing",
-                    "Led cross-functional team of 6 engineers across product releases"
-                ]
-            },
-            {
-                "role": "Software Engineer",
-                "company": "CloudScale Labs",
-                "duration": "2020 - 2022",
-                "highlights": [
-                    "Developed asynchronous REST APIs using FastAPI and PostgreSQL",
-                    "Configured CI/CD deployment pipelines on Docker and Kubernetes"
-                ]
-            }
-        ]
+        achievements = []
+        if sections["achievements"]:
+            ach_lines = [l.lstrip('-•* ').strip() for l in sections["achievements"].split("\n") if len(l.strip()) > 8]
+            achievements = ach_lines[:4]
 
-        education = [
-            {
-                "degree": "B.S. in Computer Science",
-                "institution": "State University of Technology",
-                "year": "2020",
-                "gpa": "3.8 / 4.0"
-            }
-        ]
-
-        projects = [
-            {
-                "name": "Distributed Task Scheduler",
-                "tech": ["Python", "Redis", "FastAPI"],
-                "description": "Fault-tolerant background task orchestration engine with retry policies and priority queues."
-            },
-            {
-                "name": "Real-time Telemetry Dashboard",
-                "tech": ["React", "TypeScript", "WebSocket"],
-                "description": "High-frequency streaming data visualization platform with interactive charts."
-            }
-        ]
+        summary = None
+        if sections["summary"]:
+            summary = " ".join([l.strip() for l in sections["summary"].split("\n") if l.strip()])
+        elif experience and skills:
+            summary = f"Technical professional with demonstrated expertise in {', '.join(skills[:4])}."
 
         return {
-            "name": name,
-            "email": email,
-            "phone": phone,
-            "skills": matched_skills,
+            "name": name or "Candidate",
+            "email": contact["email"],
+            "phone": contact["phone"],
+            "location": contact["location"],
+            "linkedin": contact["linkedin"],
+            "github": contact["github"],
+            "portfolio": contact["portfolio"],
+            "skills": skills,
             "education": education,
             "experience": experience,
             "projects": projects,
-            "certifications": ["AWS Certified Solutions Architect", "CKA: Certified Kubernetes Administrator"],
-            "achievements": ["Hackathon Winner (1st Place, 2023)", "Open Source Contributor"],
-            "summary": f"Experienced software engineer proficient in {', '.join(matched_skills[:4])} with a proven track record of architecting scalable distributed systems and delivering reliable user-focused products."
+            "certifications": certifications,
+            "achievements": achievements,
+            "summary": summary
         }
 
     def analyze_job_description(self, jd_text: str) -> Dict[str, Any]:
-        """Analyzes job description requirements and qualifications."""
-        lower_text = jd_text.lower()
-        
-        # Skill extraction
-        skill_catalog = [
-            "Python", "FastAPI", "React", "TypeScript", "Docker", "Kubernetes",
-            "PostgreSQL", "Redis", "AWS", "CI/CD", "System Design", "Microservices",
-            "GraphQL", "REST APIs", "Kafka", "Golang", "Java", "Terraform"
-        ]
-        
-        required_skills = []
-        for s in skill_catalog:
-            if s.lower() in lower_text:
-                required_skills.append(s)
-                
-        if not required_skills:
-            required_skills = ["Python", "FastAPI", "PostgreSQL", "Docker", "AWS", "System Design"]
-
-        return {
-            "title": "Senior AI / Full-Stack Engineer",
-            "company": "Innovate AI",
-            "required_skills": required_skills[:5],
-            "preferred_skills": required_skills[5:] if len(required_skills) > 5 else ["Kubernetes", "Redis", "Kafka"],
-            "experience_level": "3+ years professional software development",
-            "responsibilities": [
-                "Design and maintain scalable backend microservices and modern web interfaces",
-                "Collaborate with product and AI researchers to ship production AI features",
-                "Conduct code reviews, mentor junior teammates, and uphold engineering excellence"
-            ],
-            "technologies": required_skills,
-            "qualifications": [
-                "Bachelor's or equivalent experience in Computer Science or related field",
-                "Demonstrated proficiency in asynchronous programming and modern databases"
-            ]
-        }
+        """Analyzes job description requirements and qualifications from actual text."""
+        from app.services.jd_parser import parse_job_description_content
+        return parse_job_description_content(jd_text)
 
     def generate_report(
         self,

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Square, Loader2, AlertCircle, Volume2, Check } from 'lucide-react';
+import { Mic, Square, Loader2, AlertCircle, Volume2, RotateCcw } from 'lucide-react';
 import { Button } from '../common/Button';
 import { interviewsApi } from '../../api/interviews';
 import { useToast } from '../../context/ToastContext';
@@ -19,16 +19,27 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [liveTranscript, setLiveTranscript] = useState<string>('');
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerIntervalRef = useRef<any>(null);
+  const recordingTimeRef = useRef<number>(0);
+  const speechRecognitionRef = useRef<any>(null);
+  const accumulatedSpeechRef = useRef<string>('');
 
   useEffect(() => {
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.stop();
+      }
+      if (speechRecognitionRef.current) {
+        try {
+          speechRecognitionRef.current.stop();
+        } catch {
+          // ignore
+        }
       }
     };
   }, []);
@@ -39,9 +50,29 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
     return `${mins.toString().padStart(2, '0')}:${remaining.toString().padStart(2, '0')}`;
   };
 
+  const getSupportedMimeType = (): string => {
+    const types = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4',
+      'audio/ogg;codecs=opus',
+      'audio/wav',
+    ];
+    for (const t of types) {
+      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) {
+        return t;
+      }
+    }
+    return '';
+  };
+
   const startRecording = async () => {
     setPermissionError(null);
     audioChunksRef.current = [];
+    accumulatedSpeechRef.current = '';
+    setLiveTranscript('');
+    recordingTimeRef.current = 0;
+    setRecordingTime(0);
 
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -49,34 +80,68 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      const mimeType = getSupportedMimeType();
+      const options = mimeType ? { mimeType } : undefined;
+      const mediaRecorder = options ? new MediaRecorder(stream, options) : new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
+        if (event.data && event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        // Stop audio tracks to release microphone
+        const finalDuration = Math.max(recordingTimeRef.current, 1);
+        const effectiveMime = mimeType || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: effectiveMime });
+
+        // Release microphone tracks
         stream.getTracks().forEach((track) => track.stop());
 
-        // Process audio via backend Speech-to-Text
-        await processAudioUpload(audioBlob, recordingTime);
+        // Process audio upload & transcription
+        await processAudioUpload(audioBlob, finalDuration, accumulatedSpeechRef.current.trim());
       };
 
-      mediaRecorder.start(250); // Record in 250ms chunks
+      // Start Web Speech API for real-time live recognition if available in browser
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        try {
+          const recognition = new SpeechRecognition();
+          recognition.continuous = true;
+          recognition.interimResults = true;
+          recognition.lang = 'en-US';
+
+          recognition.onresult = (event: any) => {
+            let currentText = '';
+            for (let i = 0; i < event.results.length; i++) {
+              currentText += event.results[i][0].transcript + ' ';
+            }
+            accumulatedSpeechRef.current = currentText;
+            setLiveTranscript(currentText.trim());
+          };
+
+          recognition.onerror = () => {
+            // Non-fatal: audio blob upload will still happen
+          };
+
+          recognition.start();
+          speechRecognitionRef.current = recognition;
+        } catch (e) {
+          console.warn('SpeechRecognition initialization error:', e);
+        }
+      }
+
+      mediaRecorder.start(250); // Slice in 250ms chunks
       setIsRecording(true);
-      setRecordingTime(0);
 
       timerIntervalRef.current = setInterval(() => {
-        setRecordingTime((prev) => prev + 1);
+        recordingTimeRef.current += 1;
+        setRecordingTime(recordingTimeRef.current);
       }, 1000);
     } catch (err: any) {
       const msg = err.name === 'NotAllowedError'
-        ? 'Microphone permission denied. Please allow microphone access or use Text Mode.'
+        ? 'Microphone permission denied. Please allow microphone access in your browser or use Text Mode.'
         : err.message || 'Could not access microphone.';
       setPermissionError(msg);
       addToast(msg, 'warning');
@@ -87,25 +152,48 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
     }
+
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.stop();
+      } catch {
+        // ignore
+      }
+    }
+
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
     }
   };
 
-  const processAudioUpload = async (blob: Blob, duration: number) => {
+  const processAudioUpload = async (blob: Blob, duration: number, recognizedLiveText: string) => {
     setIsTranscribing(true);
+
     try {
-      const res = await interviewsApi.transcribeAudio(blob, Math.max(duration, 3));
-      addToast('Voice transcribed successfully!', 'success');
-      onTranscriptionComplete(res.transcript, res.duration_seconds);
-    } catch (err: any) {
-      addToast('Transcription fallback used.', 'info');
-      // Graceful fallback transcript so candidate is never blocked
-      onTranscriptionComplete(
-        'In our architecture, we implemented asynchronous worker processes and database connection pooling to handle scale.',
-        Math.max(duration, 5)
-      );
+      if (blob.size < 100 && !recognizedLiveText) {
+        addToast('No audio content recorded. Please speak into your microphone or use Text Mode.', 'warning');
+        return;
+      }
+
+      let finalTranscript = recognizedLiveText;
+
+      // Upload to backend transcription service
+      try {
+        const res = await interviewsApi.transcribeAudio(blob, duration);
+        if (res.transcript && res.transcript.trim()) {
+          finalTranscript = res.transcript.trim();
+        }
+      } catch (uploadErr) {
+        console.warn('Backend transcription API unavailable, using client-side recognition:', uploadErr);
+      }
+
+      if (finalTranscript && finalTranscript.trim()) {
+        addToast('Voice transcribed successfully!', 'success');
+        onTranscriptionComplete(finalTranscript.trim(), duration);
+      } else {
+        addToast('No speech was detected. Please verify your microphone or enter your response in Text Mode.', 'warning');
+      }
     } finally {
       setIsTranscribing(false);
     }
@@ -136,17 +224,26 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
 
       {/* Recording Visualizer Bars */}
       {isRecording && (
-        <div className="flex items-center justify-center gap-1.5 h-12 bg-slate-950/80 rounded-xl px-4 border border-slate-800">
-          {[12, 24, 38, 16, 42, 28, 14, 34, 46, 20, 36, 18, 30].map((height, i) => (
-            <span
-              key={i}
-              className="w-1.5 bg-gradient-to-t from-brand-600 to-brand-400 rounded-full animate-wave"
-              style={{
-                height: `${height}px`,
-                animationDelay: `${(i * 0.1)}s`,
-              }}
-            />
-          ))}
+        <div className="space-y-3">
+          <div className="flex items-center justify-center gap-1.5 h-12 bg-slate-950/80 rounded-xl px-4 border border-slate-800">
+            {[12, 24, 38, 16, 42, 28, 14, 34, 46, 20, 36, 18, 30].map((height, i) => (
+              <span
+                key={i}
+                className="w-1.5 bg-gradient-to-t from-brand-600 to-brand-400 rounded-full animate-wave"
+                style={{
+                  height: `${height}px`,
+                  animationDelay: `${(i * 0.1)}s`,
+                }}
+              />
+            ))}
+          </div>
+
+          {liveTranscript && (
+            <div className="p-3 rounded-xl bg-slate-950/90 border border-brand-500/20 text-xs text-slate-300 max-h-24 overflow-y-auto">
+              <span className="text-[10px] uppercase font-bold text-brand-400 block mb-1">Live Speech Recognition:</span>
+              <span>{liveTranscript}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -171,7 +268,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
             leftIcon={<Square className="w-4 h-4 fill-current" />}
             className="w-full"
           >
-            Stop & Transcribe Answer
+            Stop & Submit Answer
           </Button>
         )}
       </div>
@@ -179,7 +276,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
       {isTranscribing && (
         <div className="flex items-center justify-center gap-2 text-xs font-semibold text-brand-300 py-1">
           <Loader2 className="w-4 h-4 animate-spin" />
-          <span>Transcribing your speech with AI Speech Engine...</span>
+          <span>Transcribing voice recording...</span>
         </div>
       )}
     </div>

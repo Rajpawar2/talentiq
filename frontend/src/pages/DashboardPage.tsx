@@ -124,40 +124,60 @@ export const DashboardPage: React.FC = () => {
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">Tracking overall score trajectory across mock sessions</p>
             </div>
-            <Badge variant="emerald" size="sm">+14% Growth</Badge>
+            {data?.performance_trend && data.performance_trend.length > 1 ? (
+              <Badge variant="emerald" size="sm">
+                {((data.performance_trend[data.performance_trend.length - 1].overall_score - data.performance_trend[0].overall_score) >= 0 ? '+' : '') +
+                 (data.performance_trend[data.performance_trend.length - 1].overall_score - data.performance_trend[0].overall_score).toFixed(1)}% Growth
+              </Badge>
+            ) : (
+              <Badge variant="brand" size="sm">Active Tracking</Badge>
+            )}
           </div>
 
           <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data?.performance_trend || []}>
-                <defs>
-                  <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="date" stroke="#64748b" fontSize={11} tickLine={false} />
-                <YAxis stroke="#64748b" domain={[40, 100]} fontSize={11} tickLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0f172a',
-                    borderColor: '#334155',
-                    borderRadius: '0.75rem',
-                    color: '#fff',
-                    fontSize: '12px'
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="overall_score"
-                  stroke="#818cf8"
-                  strokeWidth={3}
-                  fillOpacity={1}
-                  fill="url(#scoreGradient)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            {data?.performance_trend && data.performance_trend.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={data.performance_trend}>
+                  <defs>
+                    <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <XAxis dataKey="date" stroke="#64748b" fontSize={11} tickLine={false} />
+                  <YAxis stroke="#64748b" domain={[0, 100]} fontSize={11} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#0f172a',
+                      borderColor: '#334155',
+                      borderRadius: '0.75rem',
+                      color: '#fff',
+                      fontSize: '12px'
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="overall_score"
+                    stroke="#818cf8"
+                    strokeWidth={3}
+                    fillOpacity={1}
+                    fill="url(#scoreGradient)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-slate-950/40 rounded-xl border border-dashed border-slate-800">
+                <TrendingUp className="w-8 h-8 text-slate-600 mb-2" />
+                <p className="text-sm font-semibold text-slate-300">No mock interview sessions yet</p>
+                <p className="text-xs text-slate-500 mt-1 max-w-sm">
+                  Complete your first adaptive interview to track your score trajectory and skill growth.
+                </p>
+                <Link to="/setup" className="mt-4">
+                  <Button variant="primary" size="sm">Start First Interview</Button>
+                </Link>
+              </div>
+            )}
           </div>
         </Card>
 
@@ -198,45 +218,59 @@ export const DashboardPage: React.FC = () => {
             <span className="text-xs text-slate-400">AI Assessment</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Strengths */}
-            <div className="space-y-2.5">
-              <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                Verified Strengths
-              </span>
-              {data?.skill_strengths.map((s, i) => (
-                <div key={i} className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                  <div className="flex justify-between text-xs font-medium text-slate-200 mb-1">
-                    <span>{s.skill}</span>
-                    <span className="text-emerald-400 font-bold">{s.level}%</span>
-                  </div>
-                  <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${s.level}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
+          {(data?.skill_strengths?.length || 0) > 0 || (data?.skill_gaps?.length || 0) > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Strengths */}
+              <div className="space-y-2.5">
+                <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Verified Strengths
+                </span>
+                {data?.skill_strengths && data.skill_strengths.length > 0 ? (
+                  data.skill_strengths.map((s, i) => (
+                    <div key={i} className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                      <div className="flex justify-between text-xs font-medium text-slate-200 mb-1">
+                        <span>{s.skill}</span>
+                        <span className="text-emerald-400 font-bold">{s.level}%</span>
+                      </div>
+                      <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                        <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${s.level}%` }} />
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-500 italic py-2">No verified strengths yet.</p>
+                )}
+              </div>
 
-            {/* Gaps */}
-            <div className="space-y-2.5">
-              <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                <AlertTriangle className="w-3.5 h-3.5" />
-                Focus Improvement
-              </span>
-              {data?.skill_gaps.map((s, i) => (
-                <div key={i} className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                  <div className="flex justify-between text-xs font-medium text-slate-200 mb-1">
-                    <span>{s.skill}</span>
-                    <span className="text-amber-400 font-bold">{s.level}%</span>
-                  </div>
-                  <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-amber-500 h-full rounded-full" style={{ width: `${s.level}%` }} />
-                  </div>
-                </div>
-              ))}
+              {/* Gaps */}
+              <div className="space-y-2.5">
+                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Focus Improvement
+                </span>
+                {data?.skill_gaps && data.skill_gaps.length > 0 ? (
+                  data.skill_gaps.map((s, i) => (
+                    <div key={i} className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                      <div className="flex justify-between text-xs font-medium text-slate-200 mb-1">
+                        <span>{s.skill}</span>
+                        <span className="text-amber-400 font-bold">{s.level}%</span>
+                      </div>
+                      <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                        <div className="bg-amber-500 h-full rounded-full" style={{ width: `${s.level}%` }} />
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-500 italic py-2">No focus gaps detected yet.</p>
+                )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="py-8 text-center text-slate-500 text-xs">
+              Complete your first interview or upload a resume to generate your personalized skill matrix.
+            </div>
+          )}
         </Card>
 
         {/* Recent Interviews List */}

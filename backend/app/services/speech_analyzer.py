@@ -4,15 +4,15 @@ from typing import Dict, Any, Optional
 FILLER_PATTERNS = [
     r'\bum\b',
     r'\buh\b',
+    r'\ber\b',
+    r'\bah\b',
     r'\blike\b',
     r'\bbasically\b',
     r'\bactually\b',
     r'\byou know\b',
-    r'\bso\b',
     r'\bi mean\b',
     r'\bkind of\b',
-    r'\bsort of\b',
-    r'\bright\b'
+    r'\bsort of\b'
 ]
 
 def analyze_speech_transcript(
@@ -40,13 +40,10 @@ def analyze_speech_transcript(
 
     filler_freq_pct = round((total_fillers / total_words * 100), 1) if total_words > 0 else 0.0
 
-    # Words per minute estimation if duration provided
-    wpm = None
-    if duration_seconds and duration_seconds > 0:
+    # Words per minute calculation: only calculate if duration was recorded from audio
+    wpm: Optional[float] = None
+    if duration_seconds and duration_seconds > 0 and total_words > 0:
         wpm = round((total_words / (duration_seconds / 60.0)), 1)
-    else:
-        # Assume typical conversational pace ~130 WPM
-        wpm = 130.0
 
     # Communication indicators (cautious qualitative indicators)
     clarity_score = 9.0
@@ -62,7 +59,7 @@ def analyze_speech_transcript(
         conciseness_score -= 2.0
 
     structure_score = 8.0
-    if any(k in clean_text for k in ["first", "second", "specifically", "for example", "in summary", "because"]):
+    if any(k in clean_text for k in ["first", "second", "specifically", "for example", "in summary", "because", "furthermore"]):
         structure_score += 1.2
     structure_score = min(structure_score, 10.0)
 
@@ -71,16 +68,26 @@ def analyze_speech_transcript(
     vocab_ratio = round(unique_words / total_words, 2) if total_words > 0 else 1.0
     vocab_score = min(round(vocab_ratio * 10, 1), 9.5)
 
+    if wpm is not None:
+        pacing_assessment = "Optimal" if 110 <= wpm <= 160 else ("Brisk" if wpm > 160 else "Measured")
+    else:
+        pacing_assessment = "N/A (Text Response)"
+
+    if filler_freq_pct < 4.0:
+        observations = "Clear and articulate delivery with minimal verbal hesitations."
+    else:
+        observations = f"Observed occasional verbal fillers ({filler_freq_pct}% of words). Pausing deliberately between thoughts can enhance executive presence."
+
+    if wpm is not None and (wpm > 175 or wpm < 95):
+        observations += f" Spoken pace was {wpm} WPM ({pacing_assessment})."
+
     communication_indicators = {
         "clarity_indicator": round(clarity_score, 1),
         "conciseness_indicator": round(conciseness_score, 1),
         "structure_indicator": round(structure_score, 1),
         "vocabulary_indicator": round(vocab_score, 1),
-        "pacing_assessment": "Optimal" if 110 <= wpm <= 160 else ("Brisk" if wpm > 160 else "Measured"),
-        "observations": (
-            "Clear and articulate delivery" if filler_freq_pct < 4.0 else
-            f"Observed occasional verbal fillers ({filler_freq_pct}% of words). Pausing deliberately between sentences can enhance impact."
-        )
+        "pacing_assessment": pacing_assessment,
+        "observations": observations
     }
 
     return {

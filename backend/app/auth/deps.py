@@ -43,13 +43,6 @@ def get_current_user(
             detail="User account no longer exists",
         )
     
-    if not user.email_verified:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email verification required",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
     return user
 
 def get_optional_current_user(

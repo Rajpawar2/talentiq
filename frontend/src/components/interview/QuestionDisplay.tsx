@@ -1,18 +1,22 @@
 import React from 'react';
 import { Badge } from '../common/Badge';
-import { Sparkles, HelpCircle, Flame } from 'lucide-react';
+import { Sparkles, Volume2, VolumeX, Flame } from 'lucide-react';
 import type { InterviewQuestion } from '../../types';
 
 interface QuestionDisplayProps {
   question: InterviewQuestion;
   currentIndex: number;
   totalQuestions: number;
+  isSpeaking?: boolean;
+  onToggleSpeech?: () => void;
 }
 
 export const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
   question,
   currentIndex,
   totalQuestions,
+  isSpeaking = false,
+  onToggleSpeech,
 }) => {
   const getDifficultyBadge = (diff: string) => {
     switch (diff.toLowerCase()) {
@@ -27,7 +31,7 @@ export const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
 
   return (
     <div className="p-6 rounded-2xl bg-slate-900/90 border border-slate-800/80 shadow-xl space-y-4">
-      {/* Header tags */}
+      {/* Header tags & Audio Control */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
@@ -37,12 +41,39 @@ export const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
           {getDifficultyBadge(question.difficulty_level)}
         </div>
 
-        {question.is_follow_up && (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-semibold animate-pulse">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Adaptive Follow-Up</span>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {question.is_follow_up && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-semibold animate-pulse">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Adaptive Follow-Up</span>
+            </div>
+          )}
+
+          {onToggleSpeech && (
+            <button
+              type="button"
+              onClick={onToggleSpeech}
+              title={isSpeaking ? "Pause question audio" : "Read question aloud"}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                isSpeaking
+                  ? 'bg-brand-500/20 text-brand-300 border-brand-500/40 hover:bg-brand-500/30'
+                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750 hover:text-white'
+              }`}
+            >
+              {isSpeaking ? (
+                <>
+                  <VolumeX className="w-3.5 h-3.5 text-brand-400" />
+                  <span>Stop Audio</span>
+                </>
+              ) : (
+                <>
+                  <Volume2 className="w-3.5 h-3.5 text-brand-400" />
+                  <span>Read Aloud</span>
+                </>
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main Question Text */}

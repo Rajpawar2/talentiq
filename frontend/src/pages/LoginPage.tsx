@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Bot, Mail, Lock, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import { useAuth } from '../context/AuthContext';
@@ -16,18 +16,17 @@ export const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [needsVerification, setNeedsVerification] = useState(false);
 
   useEffect(() => {
-    if (location.state?.verifiedEmail) {
-      setEmail(location.state.verifiedEmail);
+    const prefill = location.state?.registeredEmail || location.state?.email || location.state?.verifiedEmail;
+    if (prefill) {
+      setEmail(prefill);
     }
   }, [location.state]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setNeedsVerification(false);
     setIsLoading(true);
 
     try {
@@ -37,9 +36,6 @@ export const LoginPage: React.FC = () => {
     } catch (err: any) {
       const msg = err.response?.data?.detail || 'Invalid email or password.';
       setError(msg);
-      if (msg.toLowerCase().includes('verify your email')) {
-        setNeedsVerification(true);
-      }
       addToast(msg, 'error');
     } finally {
       setIsLoading(false);
@@ -58,9 +54,10 @@ export const LoginPage: React.FC = () => {
       addToast('Signed in as Demo Candidate (Alex Morgan)', 'success');
       navigate('/dashboard');
     } catch {
-      // If not yet registered in fresh DB, register automatically
+      // If not yet registered in fresh DB, register and login immediately
       try {
         await register('Alex Morgan', demoEmail, demoPass, 'Senior AI Developer');
+        await login(demoEmail, demoPass);
         addToast('Created and logged into Demo Candidate Account', 'success');
         navigate('/dashboard');
       } catch (err: any) {
@@ -128,21 +125,7 @@ export const LoginPage: React.FC = () => {
             />
 
             {error && (
-              <div className="space-y-2">
-                <p className="text-xs text-rose-400 font-medium">{error}</p>
-                {needsVerification && (
-                  <div className="p-3 rounded-xl bg-brand-500/10 border border-brand-500/30 flex items-center justify-between text-xs">
-                    <span className="text-brand-300">Email verification required</span>
-                    <button
-                      type="button"
-                      onClick={() => navigate('/verify-email', { state: { email } })}
-                      className="text-brand-400 hover:text-brand-300 font-bold underline underline-offset-2"
-                    >
-                      Verify Email
-                    </button>
-                  </div>
-                )}
-              </div>
+              <p className="text-xs text-rose-400 font-medium">{error}</p>
             )}
 
             <Button

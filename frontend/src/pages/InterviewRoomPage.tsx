@@ -42,14 +42,61 @@ export const InterviewRoomPage: React.FC = () => {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [lastAnswerResponse, setLastAnswerResponse] = useState<AnswerResponse | null>(null);
 
-  // Avatar state
+  // Avatar & Speech states
   const [avatarStatus, setAvatarStatus] = useState<'idle' | 'speaking' | 'listening' | 'evaluating'>('idle');
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   // Elapsed timer
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   // WebSocket reference
   const wsRef = useRef<WebSocket | null>(null);
+
+  const stopSpeech = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsSpeaking(false);
+    setAvatarStatus((prev) => (prev === 'speaking' ? 'idle' : prev));
+  };
+
+  const speakQuestion = (text: string) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window) || !text) return;
+    stopSpeech();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.lang = 'en-US';
+
+    utterance.onstart = () => {
+      setIsSpeaking(true);
+      setAvatarStatus('speaking');
+    };
+
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      setAvatarStatus('idle');
+    };
+
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+      setAvatarStatus('idle');
+    };
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const toggleSpeech = () => {
+    if (isSpeaking) {
+      stopSpeech();
+    } else {
+      const qText = questions[currentIndex]?.question_text;
+      if (qText) {
+        speakQuestion(qText);
+      }
+    }
+  };
 
   useEffect(() => {
     if (!interviewId) return;
@@ -60,8 +107,13 @@ export const InterviewRoomPage: React.FC = () => {
       setElapsedSeconds((prev) => prev + 1);
     }, 1000);
 
-    // Initialize WebSocket connection
-    const wsUrl = `ws://localhost:8000/ws/interview/${interviewId}`;
+    // Initialize WebSocket connection dynamically
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? `${window.location.hostname}:8000`
+      : window.location.host;
+    const wsUrl = `${protocol}//${host}/ws/interview/${interviewId}`;
+
     try {
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
@@ -86,6 +138,7 @@ export const InterviewRoomPage: React.FC = () => {
 
     return () => {
       clearInterval(interval);
+      stopSpeech();
       if (wsRef.current) wsRef.current.close();
     };
   }, [interviewId]);
@@ -109,11 +162,11 @@ export const InterviewRoomPage: React.FC = () => {
       const qList = await interviewsApi.getQuestions(interviewId);
       setQuestions(qList);
 
-      // Speaking simulation on load
-      setAvatarStatus('speaking');
-      setTimeout(() => {
-        setAvatarStatus('idle');
-      }, 2500);
+      // Read initial question aloud via browser TTS
+      const initialQ = qList[detail.current_question_index] || qList[0];
+      if (initialQ?.question_text) {
+        speakQuestion(initialQ.question_text);
+      }
     } catch (err) {
       addToast('Failed to load interview room.', 'error');
     } finally {
@@ -136,6 +189,7 @@ export const InterviewRoomPage: React.FC = () => {
     const currentQ = questions[currentIndex];
     if (!currentQ || !interviewId) return;
 
+    stopSpeech();
     setIsSubmitting(true);
     setAvatarStatus('evaluating');
 
@@ -167,11 +221,11 @@ export const InterviewRoomPage: React.FC = () => {
       setAnswerText('');
       setAudioDuration(undefined);
 
-      // Avatar speaks next question
-      setAvatarStatus('speaking');
-      setTimeout(() => {
-        setAvatarStatus('idle');
-      }, 2000);
+      // Read next question aloud
+      const nextQ = updatedQList[nextIdx];
+      if (nextQ?.question_text) {
+        speakQuestion(nextQ.question_text);
+      }
     } catch (err: any) {
       const msg = err.response?.data?.detail || 'Failed to submit answer.';
       addToast(msg, 'error');
@@ -182,6 +236,7 @@ export const InterviewRoomPage: React.FC = () => {
   };
 
   const handleSkipQuestion = async () => {
+    stopSpeech();
     const nextIdx = currentIndex + 1;
     if (nextIdx >= (session?.total_questions || questions.length)) {
       handleEndInterview();
@@ -189,6 +244,10 @@ export const InterviewRoomPage: React.FC = () => {
     }
     setCurrentIndex(nextIdx);
     setAnswerText('');
+    const nextQ = questions[nextIdx];
+    if (nextQ?.question_text) {
+      speakQuestion(nextQ.question_text);
+    }
     addToast('Question skipped.', 'info');
   };
 
@@ -301,6 +360,8 @@ export const InterviewRoomPage: React.FC = () => {
             question={currentQ}
             currentIndex={currentIndex}
             totalQuestions={totalQ}
+            isSpeaking={isSpeaking}
+            onToggleSpeech={toggleSpeech}
           />
         </div>
 

@@ -10,7 +10,6 @@ import { AppLayout } from './components/layout/AppLayout';
 import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
-import { VerifyEmailPage } from './pages/VerifyEmailPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ResumePage } from './pages/ResumePage';
 import { JobMatchingPage } from './pages/JobMatchingPage';
@@ -71,14 +70,6 @@ export const App: React.FC = () => {
               element={
                 <PublicRoute>
                   <RegisterPage />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/verify-email"
-              element={
-                <PublicRoute>
-                  <VerifyEmailPage />
                 </PublicRoute>
               }
             />

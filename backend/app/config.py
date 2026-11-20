@@ -44,11 +44,6 @@ class Settings(BaseSettings):
     EMAIL_FROM: str = os.getenv("EMAIL_FROM", "noreply@talentiq.dev")
     EMAIL_FROM_NAME: str = os.getenv("EMAIL_FROM_NAME", "TalentIQ")
 
-    # OTP Security Configuration
-    OTP_EXPIRE_MINUTES: int = int(os.getenv("OTP_EXPIRE_MINUTES", "10"))
-    OTP_RESEND_COOLDOWN_SECONDS: int = int(os.getenv("OTP_RESEND_COOLDOWN_SECONDS", "60"))
-    OTP_MAX_ATTEMPTS: int = int(os.getenv("OTP_MAX_ATTEMPTS", "5"))
-
     # CORS
     CORS_ORIGINS: List[str] = [
         "http://localhost:5173",

@@ -35,23 +35,25 @@ def init_db():
     _migrate_user_table()
 
 def _migrate_user_table():
-    """Ensure email verification columns exist and existing users remain verified."""
+    """Safely migrate user table to remove obsolete OTP columns while preserving existing users."""
     from sqlalchemy import inspect, text
     inspector = inspect(engine)
     if "users" not in inspector.get_table_names():
         return
     existing_cols = {col["name"] for col in inspector.get_columns("users")}
+    obsolete_cols = [
+        "verification_otp_hash",
+        "verification_otp_expires_at",
+        "verification_attempts",
+        "last_otp_sent_at",
+        "email_verified",
+    ]
     with engine.begin() as conn:
-        if "email_verified" not in existing_cols:
-            conn.execute(text("ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT 1"))
-        if "verification_otp_hash" not in existing_cols:
-            conn.execute(text("ALTER TABLE users ADD COLUMN verification_otp_hash VARCHAR(255)"))
-        if "verification_otp_expires_at" not in existing_cols:
-            conn.execute(text("ALTER TABLE users ADD COLUMN verification_otp_expires_at DATETIME"))
-        if "verification_attempts" not in existing_cols:
-            conn.execute(text("ALTER TABLE users ADD COLUMN verification_attempts INTEGER DEFAULT 0"))
-        if "last_otp_sent_at" not in existing_cols:
-            conn.execute(text("ALTER TABLE users ADD COLUMN last_otp_sent_at DATETIME"))
-        # Ensure any pre-existing users are marked as verified so they are not locked out
-        conn.execute(text("UPDATE users SET email_verified = 1 WHERE email_verified IS NULL"))
+        for col in obsolete_cols:
+            if col in existing_cols:
+                try:
+                    conn.execute(text(f"ALTER TABLE users DROP COLUMN {col}"))
+                except Exception:
+                    # Ignore if the underlying DB engine does not support DROP COLUMN
+                    pass
 

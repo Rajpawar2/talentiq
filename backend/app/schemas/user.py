@@ -1,33 +1,24 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 class UserRegister(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
     email: EmailStr
     password: str = Field(..., min_length=6)
+    confirm_password: Optional[str] = None
     target_role: Optional[str] = "Software Engineer"
+
+    @model_validator(mode="after")
+    def validate_password_confirmation(self):
+        if self.confirm_password is not None and self.password != self.confirm_password:
+            raise ValueError("Passwords do not match.")
+        return self
 
 class RegisterResponse(BaseModel):
     success: bool = True
-    message: str = "Verification email sent successfully."
+    message: str = "User registered successfully."
     email: str
-
-class VerifyEmailRequest(BaseModel):
-    email: EmailStr
-    otp: str = Field(..., min_length=6, max_length=6)
-
-class VerifyEmailResponse(BaseModel):
-    success: bool = True
-    message: str = "Email verified successfully"
-
-class ResendOTPRequest(BaseModel):
-    email: EmailStr
-
-class ResendOTPResponse(BaseModel):
-    success: bool = True
-    message: str = "Verification code resent successfully."
-    cooldown_seconds: int = 60
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -37,8 +28,7 @@ class UserResponse(BaseModel):
     id: str
     name: str
     email: str
-    target_role: Optional[str]
-    email_verified: bool = False
+    target_role: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

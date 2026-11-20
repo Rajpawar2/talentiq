@@ -32,9 +32,9 @@ TalentIQ is a production-grade, full-stack talent simulation platform designed f
    - Parses **PDF** and **DOCX** formats with structural entity extraction (skills, experience, projects, education).
    - Path-traversal-proof secure storage with UUID-based filenames in `backend/uploads/resumes/`.
    - Semantic matching against target Job Descriptions with percentage fit, matched skills, and detected skill gaps.
-4. **Email OTP Authentication**:
-   - Two-factor OTP email verification for secure account creation and password resets.
-   - Configurable resend cooldowns, attempt limits, and developer mock mode.
+4. **Direct JWT Authentication**:
+   - Secure account creation with input validation and immediate dashboard access.
+   - Robust bcrypt password hashing and stateless JWT bearer token authorization.
 5. **Comprehensive Assessment Reports**:
    - Multi-dimensional scoring across Technical Accuracy, Communication Clarity, Problem Solving, and Behavioral fit.
    - Interactive radar visualizer, strengths, weaknesses, question-by-question review, and personalized preparation plan.
@@ -50,7 +50,7 @@ TalentIQ is a production-grade, full-stack talent simulation platform designed f
 graph TD
     Client["React 18 + Vite Frontend\n(Tailwind CSS, Lucide Icons, Recharts)"]
     API["FastAPI Backend\n(REST API & WebSockets)"]
-    Auth["JWT Auth & Bcrypt Hashing\nEmail OTP Verification"]
+    Auth["JWT Auth & Bcrypt Hashing\nDirect Access Control"]
     Parser["Resume & JD Parser\n(pypdf & Word OpenXML)"]
     Adaptive["Adaptive Engine &\nAI Provider Abstraction"]
     DB[(PostgreSQL / SQLite\nSQLAlchemy 2.0)]
@@ -188,15 +188,15 @@ TalentIQ supports two database modes:
 
 ---
 
-## 📧 Email & OTP Configuration
+## 📧 Email Configuration
 
-TalentIQ includes two-factor OTP email verification for secure registrations and password resets:
+TalentIQ includes email integration for transactional notifications and account lifecycle:
 - **Mock Mode (Default for Development)**:
   ```env
   EMAIL_PROVIDER=smtp
   EMAIL_MOCK_MODE=true
   ```
-  OTPs are logged to the backend terminal without requiring an external SMTP relay.
+  Email delivery is safely logged to memory without requiring an external SMTP relay.
 - **Production SMTP**:
   ```env
   EMAIL_MOCK_MODE=false
@@ -291,16 +291,13 @@ cp .env.example .env
 | `STT_API_KEY` | `""` | OpenAI Whisper STT API key |
 | `MAX_UPLOAD_SIZE_MB` | `10` | Maximum allowed resume file size in megabytes |
 | `EMAIL_PROVIDER` | `smtp` | Email delivery provider |
-| `EMAIL_MOCK_MODE` | `true` | When true, logs OTP codes to terminal |
+| `EMAIL_MOCK_MODE` | `true` | When true, logs email activity in memory |
 | `SMTP_HOST` | `""` | Outgoing SMTP server hostname |
 | `SMTP_PORT` | `587` | SMTP server port |
 | `SMTP_USERNAME` | `""` | SMTP username |
 | `SMTP_PASSWORD` | `""` | SMTP password |
 | `SMTP_USE_TLS` | `true` | Enable TLS security for email delivery |
 | `EMAIL_FROM` | `noreply@talentiq.dev` | From email address |
-| `OTP_EXPIRE_MINUTES` | `10` | OTP validity duration |
-| `OTP_RESEND_COOLDOWN_SECONDS` | `60` | Cooldown period before resending OTP |
-| `OTP_MAX_ATTEMPTS` | `5` | Maximum failed verification attempts before invalidation |
 | `CORS_ORIGINS` | `localhost urls` | Comma-separated list of allowed frontend origins |
 
 ---

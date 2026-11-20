@@ -3,7 +3,6 @@ export type User = {
   name: string;
   email: string;
   target_role?: string;
-  email_verified?: boolean;
   created_at: string;
 };
 
@@ -19,17 +18,6 @@ export type RegisterResponse = {
   email: string;
 };
 
-export type VerifyEmailResponse = {
-  success: boolean;
-  message: string;
-};
-
-export type ResendOtpResponse = {
-  success: boolean;
-  message: string;
-  cooldown_seconds?: number;
-};
-
 export type ResumeData = {
   id: string;
   user_id: string;
@@ -39,6 +27,10 @@ export type ResumeData = {
     name?: string;
     email?: string;
     phone?: string;
+    location?: string;
+    linkedin?: string;
+    github?: string;
+    portfolio?: string;
     summary?: string;
     education?: Array<{ degree: string; institution: string; year: string; gpa?: string }>;
     experience?: Array<{ role: string; company: string; duration: string; highlights: string[] }>;

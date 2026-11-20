@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { AuthResponse, User, RegisterResponse, VerifyEmailResponse, ResendOtpResponse } from '../types';
+import type { AuthResponse, User, RegisterResponse } from '../types';
 
 export const authApi = {
   login: async (email: string, password: string): Promise<AuthResponse> => {
@@ -7,18 +7,20 @@ export const authApi = {
     return res.data;
   },
 
-  register: async (name: string, email: string, password: string, target_role?: string): Promise<RegisterResponse> => {
-    const res = await apiClient.post<RegisterResponse>('/auth/register', { name, email, password, target_role });
-    return res.data;
-  },
-
-  verifyEmail: async (email: string, otp: string): Promise<VerifyEmailResponse> => {
-    const res = await apiClient.post<VerifyEmailResponse>('/auth/verify-email', { email, otp });
-    return res.data;
-  },
-
-  resendOtp: async (email: string): Promise<ResendOtpResponse> => {
-    const res = await apiClient.post<ResendOtpResponse>('/auth/resend-otp', { email });
+  register: async (
+    name: string,
+    email: string,
+    password: string,
+    target_role?: string,
+    confirm_password?: string
+  ): Promise<RegisterResponse> => {
+    const res = await apiClient.post<RegisterResponse>('/auth/register', {
+      name,
+      email,
+      password,
+      confirm_password,
+      target_role,
+    });
     return res.data;
   },
 
@@ -27,4 +29,3 @@ export const authApi = {
     return res.data;
   },
 };
-

@@ -84,51 +84,65 @@ export const AnalyticsPage: React.FC = () => {
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">Tracking score progression across mock interviews</p>
             </div>
-            <Badge variant="emerald" size="sm">Upward Momentum</Badge>
+            {data?.score_over_time && data.score_over_time.length > 1 ? (
+              <Badge variant="emerald" size="sm">Active Progression</Badge>
+            ) : (
+              <Badge variant="brand" size="sm">Baseline</Badge>
+            )}
           </div>
 
           <div className="h-72 w-full pt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data?.score_over_time || []}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="date" stroke="#64748b" fontSize={11} tickLine={false} />
-                <YAxis stroke="#64748b" domain={[40, 100]} fontSize={11} tickLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0f172a',
-                    borderColor: '#334155',
-                    borderRadius: '0.75rem',
-                    color: '#fff',
-                    fontSize: '12px'
-                  }}
-                />
-                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                <Line
-                  type="monotone"
-                  dataKey="overall_score"
-                  name="Overall Index"
-                  stroke="#818cf8"
-                  strokeWidth={3}
-                  dot={{ r: 4 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="technical_score"
-                  name="Technical Depth"
-                  stroke="#38bdf8"
-                  strokeWidth={2}
-                  strokeDasharray="4 4"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="communication_score"
-                  name="Communication"
-                  stroke="#34d399"
-                  strokeWidth={2}
-                  strokeDasharray="4 4"
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {data?.score_over_time && data.score_over_time.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data.score_over_time}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <XAxis dataKey="date" stroke="#64748b" fontSize={11} tickLine={false} />
+                  <YAxis stroke="#64748b" domain={[0, 100]} fontSize={11} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#0f172a',
+                      borderColor: '#334155',
+                      borderRadius: '0.75rem',
+                      color: '#fff',
+                      fontSize: '12px'
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+                  <Line
+                    type="monotone"
+                    dataKey="overall_score"
+                    name="Overall Index"
+                    stroke="#818cf8"
+                    strokeWidth={3}
+                    dot={{ r: 4 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="technical_score"
+                    name="Technical Depth"
+                    stroke="#38bdf8"
+                    strokeWidth={2}
+                    strokeDasharray="4 4"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="communication_score"
+                    name="Communication"
+                    stroke="#34d399"
+                    strokeWidth={2}
+                    strokeDasharray="4 4"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-slate-950/40 rounded-xl border border-dashed border-slate-800">
+                <TrendingUp className="w-8 h-8 text-slate-600 mb-2" />
+                <p className="text-sm font-semibold text-slate-300">No mock interview progression data yet</p>
+                <p className="text-xs text-slate-500 mt-1 max-w-sm">
+                  Complete your first mock interview to generate progression curves across technical, communication, and problem-solving metrics.
+                </p>
+              </div>
+            )}
           </div>
         </Card>
 
