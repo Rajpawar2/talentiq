@@ -65,23 +65,29 @@ cleanup() {
 trap cleanup SIGINT SIGTERM EXIT
 
 # 3. Start Backend Server
-echo -e "${GREEN}[+] Starting FastAPI Backend server on http://localhost:8000 ...${RESET}"
-(
-    cd "$BACKEND_DIR"
-    exec .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-) &
-BACKEND_PID=$!
-
-# Brief pause to allow backend port binding
-sleep 1.5
+if lsof -i :8000 -sTCP:LISTEN >/dev/null 2>&1; then
+    echo -e "${YELLOW}[!] Port 8000 is already active (Backend running).${RESET}"
+else
+    echo -e "${GREEN}[+] Starting FastAPI Backend server on http://localhost:8000 ...${RESET}"
+    (
+        cd "$BACKEND_DIR"
+        exec .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ) &
+    BACKEND_PID=$!
+    sleep 1.5
+fi
 
 # 4. Start Frontend Vite Server
-echo -e "${GREEN}[+] Starting Vite Frontend dev server on http://localhost:5173 ...${RESET}"
-(
-    cd "$FRONTEND_DIR"
-    exec npm run dev
-) &
-FRONTEND_PID=$!
+if lsof -i :5173 -sTCP:LISTEN >/dev/null 2>&1; then
+    echo -e "${YELLOW}[!] Port 5173 is already active (Frontend running).${RESET}"
+else
+    echo -e "${GREEN}[+] Starting Vite Frontend dev server on http://localhost:5173 ...${RESET}"
+    (
+        cd "$FRONTEND_DIR"
+        exec npm run dev
+    ) &
+    FRONTEND_PID=$!
+fi
 
 echo -e "\n${BOLD}${GREEN}===================================================================="
 echo -e " TalentIQ is running live!"
@@ -89,7 +95,16 @@ echo -e "  ➜ Frontend Application: ${CYAN}http://localhost:5173${GREEN}"
 echo -e "  ➜ Backend API:          ${CYAN}http://localhost:8000${GREEN}"
 echo -e "  ➜ Interactive Swagger:  ${CYAN}http://localhost:8000/docs${GREEN}"
 echo -e "====================================================================${RESET}\n"
-echo -e "${YELLOW}Press Ctrl+C at any time to stop both servers.${RESET}\n"
+echo -e "${YELLOW}Press Ctrl+C at any time to stop servers.${RESET}\n"
 
 # Wait for background processes
-wait $BACKEND_PID $FRONTEND_PID
+if [ -n "$BACKEND_PID" ] && [ -n "$FRONTEND_PID" ]; then
+    wait $BACKEND_PID $FRONTEND_PID
+elif [ -n "$BACKEND_PID" ]; then
+    wait $BACKEND_PID
+elif [ -n "$FRONTEND_PID" ]; then
+    wait $FRONTEND_PID
+else
+    echo -e "${GREEN}[✓] Both services are actively running.${RESET}"
+    sleep infinity 2>/dev/null || wait
+fi

@@ -265,3 +265,19 @@ def test_10_no_otp_endpoints_remain(client):
     # Verify /api/auth/dev-mock-otp is gone
     dev_res = client.get(f"/api/auth/dev-mock-otp?email={email}")
     assert dev_res.status_code == 404
+
+
+def test_11_demo_login_endpoint(client):
+    """11. Demo login endpoint idempotently signs in or creates demo user and issues token."""
+    res = client.post("/api/auth/demo")
+    assert res.status_code == 200
+    data = res.json()
+    assert "access_token" in data
+    assert data["token_type"] == "bearer"
+    assert data["user"]["email"] == "alex.morgan@example.com"
+
+    # Second call should also succeed idempotently
+    res2 = client.post("/api/auth/demo")
+    assert res2.status_code == 200
+    assert res2.json()["user"]["email"] == "alex.morgan@example.com"
+

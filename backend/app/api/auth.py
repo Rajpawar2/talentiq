@@ -85,6 +85,48 @@ def login_user(payload: UserLogin, db: Session = Depends(get_db)):
     )
 
 
+@router.post("/demo", response_model=Token)
+def demo_login(db: Session = Depends(get_db)):
+    """
+    Authenticates or automatically initializes the demo candidate account (Alex Morgan).
+    Always guarantees instant 1-click access without manual registration requirements.
+    """
+    demo_email = "alex.morgan@example.com"
+    demo_pass = "DemoPass123!"
+
+    user = db.query(User).filter(User.email == demo_email).first()
+    if not user:
+        user = User(
+            name="Alex Morgan",
+            email=demo_email,
+            hashed_password=hash_password(demo_pass),
+            target_role="Senior AI Developer"
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        logger.info("[AUTH] Initialized new demo candidate: %s", demo_email)
+    else:
+        # Guarantee password compatibility
+        if not verify_password(demo_pass, user.hashed_password):
+            user.hashed_password = hash_password(demo_pass)
+            db.commit()
+            db.refresh(user)
+            logger.info("[AUTH] Synchronized demo candidate password: %s", demo_email)
+
+    token = create_access_token(
+        data={"sub": user.id, "email": user.email},
+        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    logger.info("[AUTH] Demo candidate logged in: %s (id=%s)", demo_email, user.id)
+
+    return Token(
+        access_token=token,
+        token_type="bearer",
+        user=UserResponse.model_validate(user)
+    )
+
+
 @router.get("/me", response_model=UserResponse)
 def get_current_user_profile(current_user: User = Depends(get_current_user)):
     """Retrieves the authenticated user's profile details."""

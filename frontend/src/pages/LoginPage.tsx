@@ -9,7 +9,7 @@ import { useToast } from '../context/ToastContext';
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, register } = useAuth();
+  const { login, demoLogin, register } = useAuth();
   const { addToast } = useToast();
 
   const [email, setEmail] = useState('');
@@ -34,7 +34,10 @@ export const LoginPage: React.FC = () => {
       addToast('Welcome back to TalentIQ!', 'success');
       navigate('/dashboard');
     } catch (err: any) {
-      const msg = err.response?.data?.detail || 'Invalid email or password.';
+      const isNetworkErr = !err.response || err.code === 'ERR_NETWORK';
+      const msg = isNetworkErr
+        ? 'Cannot connect to backend server. Please ensure the backend is running on http://localhost:8000.'
+        : (err.response?.data?.detail || 'Invalid email or password.');
       setError(msg);
       addToast(msg, 'error');
     } finally {
@@ -45,23 +48,37 @@ export const LoginPage: React.FC = () => {
   const handleDemoLogin = async () => {
     setIsLoading(true);
     setError(null);
-    const demoEmail = 'alex.morgan@example.com';
-    const demoPass = 'DemoPass123!';
 
     try {
-      // Attempt login first
-      await login(demoEmail, demoPass);
+      // Direct atomic demo sign-in
+      await demoLogin();
       addToast('Signed in as Demo Candidate (Alex Morgan)', 'success');
       navigate('/dashboard');
-    } catch {
-      // If not yet registered in fresh DB, register and login immediately
+    } catch (err: any) {
+      const isNetworkErr = !err.response || err.code === 'ERR_NETWORK';
+      if (isNetworkErr) {
+        const msg = 'Cannot connect to backend server. Please ensure the backend is running on http://localhost:8000.';
+        setError(msg);
+        addToast(msg, 'error');
+        return;
+      }
+
+      // Fallback: standard login attempt
       try {
-        await register('Alex Morgan', demoEmail, demoPass, 'Senior AI Developer');
-        await login(demoEmail, demoPass);
-        addToast('Created and logged into Demo Candidate Account', 'success');
+        await login('alex.morgan@example.com', 'DemoPass123!');
+        addToast('Signed in as Demo Candidate (Alex Morgan)', 'success');
         navigate('/dashboard');
-      } catch (err: any) {
-        setError('Could not initialize demo account. Please try manual register.');
+      } catch {
+        try {
+          await register('Alex Morgan', 'alex.morgan@example.com', 'DemoPass123!', 'Senior AI Developer');
+          await login('alex.morgan@example.com', 'DemoPass123!');
+          addToast('Created and logged into Demo Candidate Account', 'success');
+          navigate('/dashboard');
+        } catch (regErr: any) {
+          const msg = regErr.response?.data?.detail || 'Could not initialize demo account. Please try manual register.';
+          setError(msg);
+          addToast(msg, 'error');
+        }
       }
     } finally {
       setIsLoading(false);

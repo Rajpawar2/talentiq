@@ -6,6 +6,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  demoLogin: () => Promise<void>;
   register: (name: string, email: string, password: string, target_role?: string, confirm_password?: string) => Promise<RegisterResponse>;
   logout: () => void;
   isAuthenticated: boolean;
@@ -41,6 +42,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(res.user);
   };
 
+  const demoLogin = async () => {
+    const res = await authApi.demoLogin();
+    localStorage.setItem('talentiq_token', res.access_token);
+    setUser(res.user);
+  };
+
   const register = async (
     name: string,
     email: string,
@@ -58,7 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, loading, login, demoLogin, register, logout, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

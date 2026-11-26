@@ -1,6 +1,18 @@
 import os
+from pathlib import Path
 from typing import List
 from pydantic_settings import BaseSettings
+
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+DEFAULT_SQLITE_PATH = BACKEND_DIR / "talentiq.db"
+
+def _resolve_database_url() -> str:
+    env_url = os.getenv("DATABASE_URL")
+    if env_url:
+        if env_url.startswith("sqlite:///./") or env_url == "sqlite:///talentiq.db":
+            return f"sqlite:///{DEFAULT_SQLITE_PATH}"
+        return env_url
+    return f"sqlite:///{DEFAULT_SQLITE_PATH}"
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "TalentIQ"
@@ -8,7 +20,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api"
     
     # Database: Supports SQLite (zero-config local dev) or PostgreSQL (production/docker)
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./talentiq.db")
+    DATABASE_URL: str = _resolve_database_url()
     
     # Redis (Optional in local mock mode, used for task caching/pubsub)
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
